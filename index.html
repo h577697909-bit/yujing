@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chargeback Alert Pro - MVP Prototype</title>
+
+  <!--
+    Chargeback Alert Pro
+    前端原型说明：
+    1. 单文件 HTML，可本地直接打开预览。
+    2. 页面结构和交互已模块化，后续技术可拆成 Vue / React / Shopify Polaris。
+    3. 图表优先使用 ApexCharts CDN；如网络不可用，会自动降级为内置 SVG 图。
+    4. 当前数据均为 mockData，后续替换为真实 API 返回即可。
+  -->
+
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+  <style>
+    *{box-sizing:border-box}
+    :root{
+      --bg:#f4f7fb;
+      --card:#ffffff;
+      --text:#101828;
+      --muted:#667085;
+      --line:#e6ebf2;
+      --nav:#06162e;
+      --nav2:#031022;
+      --blue:#2563eb;
+      --blue-soft:#eff6ff;
+      --red:#ef4444;
+      --red-soft:#fff1f2;
+      --orange:#f97316;
+      --orange-soft:#ffedd5;
+      --green:#16a34a;
+      --green-soft:#dcfce7;
+      --purple:#7c3aed;
+      --purple-soft:#ede9fe;
+      --shadow:0 8px 24px rgba(15,23,42,.06);
+      --radius:16px;
+    }
+
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    button,input,select,textarea{font-family:inherit}
+    button{cursor:pointer}
+    .app{min-height:100vh;display:flex}
+
+    /* Sidebar */
+    .sidebar{
+      width:264px;
+      min-height:100vh;
+      background:linear-gradient(180deg,var(--nav),var(--nav2));
+      color:#d7e2f3;
+      position:fixed;
+      left:0;top:0;bottom:0;
+      padding:22px 18px;
+      display:flex;
+      flex-direction:column;
+      z-index:20;
+    }
+
+    .logo-row{display:flex;align-items:center;gap:12px;margin-bottom:30px}
+    .logo{
+      width:46px;height:46px;border-radius:15px;
+      background:linear-gradient(135deg,#3b82f6,#7c3aed);
+      color:white;display:flex;align-items:center;justify-content:center;
+      font-size:24px;box-shadow:0 12px 28px rgba(37,99,235,.35);
+    }
+    .logo-title{font-size:20px;font-weight:900;color:white;line-height:1}
+    .logo-sub{font-size:13px;color:#a9b8d0;margin-top:5px}
+    .nav-title{font-size:12px;color:#7f91ad;margin:18px 8px 8px}
+    .nav-item{
+      width:100%;height:48px;border:0;background:transparent;color:#c7d4ea;
+      border-radius:12px;display:flex;align-items:center;gap:12px;
+      padding:0 14px;font-size:15px;text-align:left;margin-bottom:6px;
+    }
+    .nav-item:hover{background:rgba(255,255,255,.08);color:white}
+    .nav-item.active{
+      background:linear-gradient(135deg,#2563eb,#3f5be8);
+      color:white;box-shadow:0 8px 18px rgba(37,99,235,.36);
+    }
+    .sidebar-bottom{
+      margin-top:auto;border-top:1px solid rgba(255,255,255,.12);
+      padding-top:16px;
+    }
+    .mini-row{display:flex;align-items:center;gap:12px;padding:12px 8px;border-radius:12px}
+    .mini-row:hover{background:rgba(255,255,255,.06)}
+    .avatar{
+      width:42px;height:42px;border-radius:50%;
+      background:linear-gradient(135deg,#7c3aed,#3b82f6);
+      color:white;display:flex;align-items:center;justify-content:center;
+      font-weight:900;
+    }
+
+    /* Layout */
+    .main{margin-left:264px;flex:1;min-height:100vh}
+    .topbar{
+      height:76px;background:white;border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;
+      padding:0 30px;position:sticky;top:0;z-index:10;
+    }
+    .top-title{font-size:26px;font-weight:900}
+    .top-actions{display:flex;align-items:center;gap:12px}
+    input,select,textarea{
+      border:1px solid #d8e0ea;background:white;border-radius:10px;
+      padding:0 14px;font-size:14px;color:#344054;outline:none;
+    }
+    input,select{height:40px}
+    textarea{padding:12px;min-height:86px;resize:vertical}
+    input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+    .icon-btn{
+      width:40px;height:40px;border-radius:50%;border:0;background:white;
+      box-shadow:0 1px 3px rgba(16,24,40,.12);position:relative;
+    }
+    .dot-count{
+      position:absolute;right:-4px;top:-4px;background:var(--red);color:white;
+      min-width:20px;height:20px;border-radius:999px;font-size:11px;
+      display:flex;align-items:center;justify-content:center;font-weight:800;
+    }
+    .content{padding:24px 30px 44px}
+    .page{display:none}
+    .page.active{display:block}
+
+    /* Components */
+    .card{
+      background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+      box-shadow:var(--shadow);
+    }
+    .panel{padding:20px}
+    .grid{display:grid;gap:16px}
+    .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .grid-2{grid-template-columns:minmax(0,2fr) minmax(360px,1fr)}
+    .grid-3{grid-template-columns:1fr 1fr 1fr}
+    .grid-half{grid-template-columns:1fr 1fr}
+
+    .btn{
+      height:40px;border-radius:10px;border:1px solid #d8e0ea;background:white;
+      color:#344054;padding:0 16px;font-size:14px;font-weight:800;
+      display:inline-flex;align-items:center;gap:6px;
+    }
+    .btn:hover{filter:brightness(.98)}
+    .btn.primary{background:var(--blue);color:white;border-color:var(--blue)}
+    .btn.red{background:var(--red);color:white;border-color:var(--red)}
+    .btn.dark{background:#111827;color:white;border-color:#111827}
+    .btn.ghost{border:0;background:transparent;color:var(--blue);height:auto;padding:0}
+
+    .badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:900;white-space:nowrap}
+    .badge.red{background:var(--red-soft);color:#dc2626}
+    .badge.orange{background:var(--orange-soft);color:#f97316}
+    .badge.green{background:var(--green-soft);color:#16a34a}
+    .badge.blue{background:#dbeafe;color:#2563eb}
+    .badge.gray{background:#f2f4f7;color:#475467}
+    .badge.purple{background:var(--purple-soft);color:#7c3aed}
+
+    .muted{color:var(--muted);font-size:13px}
+    .section-title{font-size:18px;font-weight:900}
+
+    /* Dashboard */
+    .risk-banner{
+      border:1px solid #fecaca;background:linear-gradient(90deg,#fff1f2,#fff7ed);
+      border-radius:16px;padding:18px 22px;display:flex;align-items:center;
+      justify-content:space-between;margin-bottom:18px;box-shadow:0 8px 26px rgba(239,68,68,.08);
+    }
+    .risk-left{display:flex;align-items:center;gap:16px}
+    .warn-icon{
+      width:44px;height:44px;border-radius:50%;background:#fee2e2;color:#dc2626;
+      display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;
+    }
+    .risk-title{font-weight:900;color:#991b1b}
+    .risk-sub{font-size:13px;color:#b91c1c;margin-top:4px}
+
+    .kpi{padding:22px;display:flex;align-items:center;gap:18px}
+    .kpi-icon{
+      width:64px;height:64px;border-radius:50%;display:flex;
+      align-items:center;justify-content:center;font-size:28px;flex-shrink:0;
+    }
+    .kpi-icon.red{background:#fee2e2;color:var(--red)}
+    .kpi-icon.orange{background:#ffedd5;color:var(--orange)}
+    .kpi-icon.purple{background:#ede9fe;color:var(--purple)}
+    .kpi-icon.green{background:#dcfce7;color:var(--green)}
+    .kpi-title{font-size:15px;color:#344054}
+    .kpi-value{font-size:30px;font-weight:900;margin:7px 0}
+    .trend-up{color:var(--green);font-weight:800}
+    .trend-down{color:var(--red);font-weight:800}
+
+    .panel-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px}
+    .chart-tabs{display:inline-flex;background:#f3f6fb;border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+    .chart-tab{
+      height:32px;border:0;border-radius:9px;background:transparent;padding:0 14px;
+      font-size:13px;font-weight:800;color:#64748b;
+    }
+    .chart-tab.active{background:var(--blue);color:white;box-shadow:0 6px 14px rgba(37,99,235,.22)}
+    #chargebackRateChart{height:315px}
+    .chart-note{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+    .chart-note>div{border:1px solid #edf1f7;background:#fff;border-radius:12px;padding:10px 12px}
+    .chart-note span{display:block;color:#94a3b8;font-size:12px}
+    .chart-note b{font-size:14px;color:#1f2937}
+
+    .risk-table,.data-table{width:100%;border-collapse:collapse}
+    .risk-table th,.data-table th{
+      color:#667085;text-align:left;font-size:13px;font-weight:800;
+      padding:12px 10px;border-bottom:1px solid var(--line);
+    }
+    .risk-table td,.data-table td{
+      padding:14px 10px;border-bottom:1px solid var(--line);
+      font-size:14px;color:#344054;vertical-align:middle;
+    }
+    .data-table{min-width:900px}
+    .table-wrap{overflow:auto}
+
+    .donut-area{display:flex;align-items:center;justify-content:center;gap:38px;min-height:245px}
+    .donut{
+      width:178px;height:178px;border-radius:50%;
+      background:conic-gradient(#2563eb 0 35%,#22c55e 35% 60%,#f97316 60% 80%,#8b5cf6 80% 95%,#cbd5e1 95% 100%);
+      display:flex;align-items:center;justify-content:center;
+    }
+    .donut-inner{
+      width:92px;height:92px;border-radius:50%;background:white;
+      display:flex;align-items:center;justify-content:center;text-align:center;
+    }
+    .donut-num{font-size:25px;font-weight:900}
+    .risk-list{font-size:14px;line-height:2.4;min-width:160px}
+    .risk-list span{float:right;font-weight:900}
+
+    .task-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .task-card{
+      border-radius:14px;padding:18px;display:flex;align-items:center;justify-content:space-between;
+    }
+    .task-card.blue{background:#eff6ff}
+    .task-card.red{background:#fff1f2}
+    .task-card.green{background:#ecfdf5}
+    .task-card.teal{background:#f0fdfa}
+    .task-num{font-size:26px;font-weight:900}
+    .task-link{font-size:13px;color:var(--blue);margin-top:6px;cursor:pointer;font-weight:800}
+    .task-icon{
+      width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.8);
+      display:flex;align-items:center;justify-content:center;font-size:24px;
+    }
+
+    .alert-row{display:flex;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+    .alert-row:last-child{border-bottom:0}
+    .alert-icon{
+      width:42px;height:42px;border-radius:50%;display:flex;align-items:center;
+      justify-content:center;font-size:20px;flex-shrink:0;
+    }
+    .alert-icon.red{background:#fee2e2;color:var(--red)}
+    .alert-icon.orange{background:#ffedd5;color:var(--orange)}
+    .alert-icon.purple{background:#ede9fe;color:var(--purple)}
+    .alert-icon.blue{background:#dbeafe;color:var(--blue)}
+    .alert-body{flex:1}
+    .alert-title{font-weight:900;font-size:14px}
+    .alert-sub{font-size:13px;color:#667085;margin-top:4px}
+
+    /* Page common */
+    .page-head{
+      min-height:72px;border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;padding:0 20px;gap:12px;
+    }
+    .page-title{font-weight:900;font-size:18px;display:flex;align-items:center;gap:10px}
+    .filters{display:grid;grid-template-columns:260px 220px 220px 1fr;gap:12px;margin-bottom:18px}
+    .filters .spacer{min-height:1px}
+
+    /* Matching rules */
+    .rule-layout{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:18px}
+    .rule-card{
+      border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,#fff,#f8fbff);
+      padding:16px;margin-bottom:14px;cursor:pointer;transition:.18s;
+    }
+    .rule-card:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 10px 25px rgba(37,99,235,.14)}
+    .rule-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    .rule-meta{display:flex;gap:12px;align-items:center}
+    .rule-id{
+      width:40px;height:40px;border-radius:12px;background:#eff6ff;color:var(--blue);
+      display:flex;align-items:center;justify-content:center;font-weight:900;
+    }
+    .progress{height:8px;background:#eef2f7;border-radius:999px;flex:1;overflow:hidden}
+    .progress span{display:block;height:100%;background:var(--blue)}
+    .chip-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .chip{
+      border:1px solid #bfdbfe;background:white;color:var(--blue);
+      border-radius:10px;padding:8px 10px;text-align:center;font-weight:800;font-size:12px;
+    }
+
+    /* Modal / Drawer */
+    .drawer-mask,.modal-mask{
+      position:fixed;inset:0;background:rgba(15,23,42,.42);display:none;z-index:100;
+    }
+    .drawer-mask{justify-content:flex-end}
+    .modal-mask{align-items:center;justify-content:center}
+    .drawer{
+      width:580px;max-width:100%;height:100%;background:white;
+      box-shadow:-12px 0 30px rgba(0,0,0,.18);display:flex;flex-direction:column;
+    }
+    .modal{
+      width:640px;max-width:92vw;background:white;border-radius:18px;
+      box-shadow:0 24px 60px rgba(15,23,42,.25);overflow:hidden;
+    }
+    .drawer-head,.modal-head{
+      height:68px;border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+    }
+    .drawer-body{flex:1;overflow:auto;padding:24px}
+    .modal-body{padding:22px}
+    .drawer-foot,.modal-foot{
+      border-top:1px solid var(--line);padding:16px 24px;display:flex;justify-content:space-between;gap:12px;
+    }
+    .modal-foot{justify-content:flex-end}
+    .close{border:0;background:transparent;font-size:24px;color:#667085}
+    .decision{border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+    .decision.red{border-color:#fecaca;background:#fff1f2}
+    .decision.blue{background:#eff6ff}
+    .decision.yellow{background:#fffbeb}
+    .risk-score{font-size:42px;color:#dc2626;font-weight:900}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .field label{display:block;font-size:13px;color:#667085;margin-bottom:7px;font-weight:800}
+    .field input,.field select,.field textarea{width:100%}
+    .field.full{grid-column:1/-1}
+    .rule-help{margin-top:16px;padding:14px;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-size:13px;line-height:1.7}
+    .switch{width:44px;height:24px;background:var(--blue);border-radius:999px;display:inline-block;padding:2px}
+    .switch:before{content:"";display:block;width:20px;height:20px;background:white;border-radius:50%;transform:translateX(20px)}
+    .switch.off{background:#d0d5dd}
+    .switch.off:before{transform:translateX(0)}
+
+    .toast{
+      position:fixed;top:92px;right:30px;background:#111827;color:white;
+      padding:12px 18px;border-radius:10px;z-index:200;box-shadow:0 12px 28px rgba(0,0,0,.2);
+      font-size:14px;font-weight:800;
+    }
+
+    @media(max-width:1200px){
+      .sidebar{display:none}.main{margin-left:0}
+      .grid-4{grid-template-columns:repeat(2,1fr)}
+      .grid-2,.grid-3,.grid-half,.rule-layout,.filters{grid-template-columns:1fr}
+      .top-actions input,.top-actions select{display:none}
+    }
+    @media(max-width:760px){
+      .topbar{padding:0 16px}.content{padding:16px}
+      .grid-4{grid-template-columns:1fr}
+      .risk-banner{display:block}.risk-banner .btn{margin-top:14px}
+      .task-grid,.form-grid,.chart-note{grid-template-columns:1fr}
+      .kpi-value{font-size:24px}
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo-row">
+      <div class="logo">⚡</div>
+      <div>
+        <div class="logo-title">预警插件</div>
+        <div class="logo-sub">Chargeback Alert</div>
+      </div>
+    </div>
+
+    <button class="nav-item active" data-page="dashboard">🏠 工作台</button>
+
+    <div class="nav-title">拒付管理</div>
+    <button class="nav-item" data-page="alerts">⚠️ 拒付预警</button>
+    <button class="nav-item" data-page="matching">🔗 交易匹配</button>
+    <button class="nav-item" data-page="bin">💳 BIN确认</button>
+
+    <div class="nav-title">系统</div>
+    <button class="nav-item" data-page="settings">⚙️ 系统设置</button>
+    <button class="nav-item" data-page="blacklist">🛡️ 黑名单管理</button>
+    <button class="nav-item" data-page="users">👥 用户管理</button>
+
+    <div class="sidebar-bottom">
+      <div class="mini-row">🛍️ <div><b>My Store</b><div class="muted">Shopify店铺</div></div></div>
+      <div class="mini-row"><div class="avatar">J</div><div><b>John Doe</b><div class="muted">管理员</div></div></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="top-title" id="topTitle">工作台</div>
+      <div class="top-actions">
+        <select><option>全部店铺</option><option>My Store</option></select>
+        <input value="2024-05-01 ~ 2024-05-31" />
+        <button class="btn" id="langToggle" onclick="toggleLanguage()">English</button>
+        <button class="icon-btn" onclick="toast(t('暂无新通知'))">🔔<span class="dot-count">12</span></button>
+        <button class="icon-btn" onclick="toast(t('帮助中心开发中'))">?</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Dashboard -->
+      <section class="page active" id="dashboard">
+        <div class="risk-banner">
+          <div class="risk-left">
+            <div class="warn-icon">▲</div>
+            <div>
+              <div class="risk-title">风险预警：您的拒付率已超过阈值（1.2%），请及时处理高风险订单，避免更多损失！</div>
+              <div class="risk-sub">系统检测到 5 笔高风险订单，预计潜在损失 $8,675.32</div>
+            </div>
+          </div>
+          <button class="btn red" data-page="alerts">立即处理</button>
+        </div>
+
+        <div class="grid grid-4">
+          <div class="card kpi">
+            <div class="kpi-icon red">💲</div>
+            <div><div class="kpi-title">潜在拒付损失</div><div class="kpi-value" style="color:var(--red)">$8,675.32</div><div>较上期 <span class="trend-up">↑ 18.7%</span></div></div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-icon orange">🛡️</div>
+            <div><div class="kpi-title">当前拒付率</div><div class="kpi-value" style="color:var(--orange)">1.62%</div><div>较上期 <span class="trend-down">↑ 0.35%</span></div></div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-icon purple">📋</div>
+            <div><div class="kpi-title">高风险订单</div><div class="kpi-value" style="color:var(--purple)">56</div><div>较上期 <span class="trend-down">↑ 12</span></div></div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-icon green">✅</div>
+            <div><div class="kpi-title">已拦截金额</div><div class="kpi-value" style="color:var(--green)">$3,562.11</div><div>较上期 <span class="trend-up">↑ 25.3%</span></div></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:16px">
+          <div class="card panel">
+            <div class="panel-head">
+              <div>
+                <div class="section-title">拒付率趋势 <span class="muted">ⓘ</span></div>
+                <div class="muted" style="margin-top:4px">监控拒付率变化，超过阈值自动标记风险点</div>
+              </div>
+              <div class="chart-tabs">
+                <button class="chart-tab" data-range="7">7天</button>
+                <button class="chart-tab active" data-range="30">30天</button>
+                <button class="chart-tab" data-range="90">90天</button>
+              </div>
+            </div>
+            <div id="chargebackRateChart"></div>
+            <div class="chart-note">
+              <div><span>风险峰值</span><b>1.91%</b></div>
+              <div><span>超阈值天数</span><b>9 天</b></div>
+              <div><span>主要风险来源</span><b>虚拟卡 / 高客单</b></div>
+            </div>
+          </div>
+
+          <div class="card panel">
+            <div class="panel-head">
+              <div class="section-title">高风险订单</div>
+              <button class="btn ghost" data-page="alerts">查看更多 ›</button>
+            </div>
+            <table class="risk-table">
+              <tbody id="highRiskOrders"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid grid-3" style="margin-top:16px">
+          <div class="card panel">
+            <div class="section-title">风险分布</div>
+            <div class="donut-area">
+              <div class="donut"><div class="donut-inner"><div><div class="donut-num">100%</div><div class="muted">风险占比</div></div></div></div>
+              <div class="risk-list">
+                <div><i style="color:#2563eb">●</i> 国家风险 <span>35%</span></div>
+                <div><i style="color:#22c55e">●</i> BIN风险 <span>25%</span></div>
+                <div><i style="color:#f97316">●</i> 地址风险 <span>20%</span></div>
+                <div><i style="color:#8b5cf6">●</i> 行为风险 <span>15%</span></div>
+                <div><i style="color:#cbd5e1">●</i> 其他 <span>5%</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card panel">
+            <div class="section-title" style="margin-bottom:18px">任务中心</div>
+            <div class="task-grid">
+              <div class="task-card blue"><div><div>待审核订单</div><div class="task-num" style="color:var(--blue)">23</div><div class="task-link" data-page="alerts">立即处理 ›</div></div><div class="task-icon">📋</div></div>
+              <div class="task-card red"><div><div>待处理预警</div><div class="task-num" style="color:var(--red)">18</div><div class="task-link" data-page="alerts">立即处理 ›</div></div><div class="task-icon">🔔</div></div>
+              <div class="task-card green"><div><div>待匹配交易</div><div class="task-num" style="color:var(--green)">12</div><div class="task-link" data-page="matching">立即匹配 ›</div></div><div class="task-icon">🔗</div></div>
+              <div class="task-card teal"><div><div>待确认BIN</div><div class="task-num" style="color:#0f766e">7</div><div class="task-link" data-page="bin">立即确认 ›</div></div><div class="task-icon">🛡️</div></div>
+            </div>
+          </div>
+
+          <div class="card panel">
+            <div class="panel-head">
+              <div class="section-title">最新预警</div>
+              <button class="btn ghost" data-page="alerts">查看更多 ›</button>
+            </div>
+            <div id="latestAlerts"></div>
+          </div>
+        </div>
+
+        <div class="card panel" style="margin-top:16px">
+          <div class="section-title" style="margin-bottom:12px">近期拒付记录</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>拒付单号</th><th>订单号</th><th>金额</th><th>拒付原因</th><th>拒付日期</th><th>匹配状态</th><th>操作</th></tr></thead>
+              <tbody id="chargebackRecords"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Alerts -->
+      <section class="page" id="alerts">
+        <div class="card">
+          <div class="page-head">
+            <div class="page-title">⚠️ 拒付预警</div>
+            <button class="btn primary" data-page="descriptor">▣ 描述符</button>
+          </div>
+          <div class="panel">
+            <div class="filters">
+              <input placeholder="搜索编号 / 订单号">
+              <input placeholder="日期">
+              <select><option>状态：未处理</option><option>处理中</option><option>已处理</option></select>
+              <div class="spacer"></div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>类型</th><th>编号</th><th>警报时间</th><th>金额</th><th>卡号</th><th>描述符</th><th>风险等级</th><th>操作</th></tr></thead>
+                <tbody id="alertTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Descriptor -->
+      <section class="page" id="descriptor">
+        <div class="card">
+          <div class="page-head">
+            <div class="page-title"><button class="btn" data-page="alerts">← 返回</button> 拒付预警 - 描述符</div>
+            <button class="btn primary" onclick="openModal('descriptorModal')">＋ 添加描述符</button>
+          </div>
+          <div class="panel">
+            <div class="filters">
+              <input placeholder="描述符">
+              <select><option>状态：请选择</option><option>已启用</option><option>审核中</option><option>停用</option></select>
+              <div class="spacer"></div><div class="spacer"></div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>编号</th><th>匹配类型</th><th>标签</th><th>描述符</th><th>添加时间</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody id="descriptorTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Matching -->
+      <section class="page" id="matching">
+        <div class="rule-layout">
+          <div class="card">
+            <div class="page-head">
+              <div class="page-title"><button class="btn" data-page="dashboard">← 返回</button> 交易上传记录</div>
+              <button class="btn primary" onclick="toast('上传文件功能待接入')">上传文件</button>
+            </div>
+            <div class="panel table-wrap">
+              <table class="data-table">
+                <thead><tr><th>编号</th><th>交易数量</th><th>异常数量</th><th>创建时间</th><th>操作</th></tr></thead>
+                <tbody id="uploadTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="page-head">
+              <div><b>匹配规则</b><div class="muted">最多 5 组规则，按优先级匹配</div></div>
+              <button class="btn dark" onclick="openDrawer('ruleDrawer')">＋ 新建规则</button>
+            </div>
+            <div class="panel" id="ruleCards"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BIN -->
+      <section class="page" id="bin">
+        <div class="card">
+          <div class="page-head">
+            <div class="page-title">💳 发卡 BIN 确认</div>
+            <button class="btn primary" onclick="openModal('binModal')">新增 BIN 规则</button>
+          </div>
+          <div class="panel">
+            <div class="filters">
+              <input placeholder="BIN 前6位/8位">
+              <select><option>卡组织：全部</option><option>Visa</option><option>Mastercard</option></select>
+              <select><option>风险等级：全部</option><option>高</option><option>中</option><option>低</option></select>
+              <div class="spacer"></div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>BIN</th><th>发卡银行</th><th>卡组织</th><th>发卡国家</th><th>卡类型</th><th>风险等级</th><th>风险原因</th></tr></thead>
+                <tbody id="binTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section class="page" id="settings">
+        <div class="card page-head">
+          <div class="page-title">⚙️ 系统设置</div>
+          <button class="btn primary" onclick="toast(t('设置已保存'))">保存设置</button>
+        </div>
+        <div class="grid grid-half" style="margin-top:16px">
+          <div class="card panel">
+            <div class="section-title">通知策略</div>
+            <div class="task-card blue" style="margin-top:16px"><div><b>邮件通知</b><div class="muted">收到拒付预警时发送邮件</div></div><span class="switch"></span></div>
+            <div class="task-card green" style="margin-top:12px"><div><b>后台弹窗</b><div class="muted">系统内实时提醒商家</div></div><span class="switch"></span></div>
+          </div>
+          <div class="card panel">
+            <div class="section-title">风险策略</div>
+            <div style="margin-top:16px"><div class="muted">风险评分阈值</div><input type="range" min="50" max="95" value="80" style="width:100%;margin-top:16px"><b>80</b></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Blacklist -->
+      <section class="page" id="blacklist">
+        <div class="card">
+          <div class="page-head">
+            <div class="page-title">🛡️ 黑名单管理</div>
+            <button class="btn primary" onclick="toast(t('添加黑名单功能待接入'))">添加黑名单</button>
+          </div>
+          <div class="panel table-wrap">
+            <table class="data-table">
+              <thead><tr><th>类型</th><th>内容</th><th>命中次数</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="blacklistTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Users -->
+      <section class="page" id="users">
+        <div class="card">
+          <div class="page-head">
+            <div class="page-title">👥 用户管理</div>
+            <button class="btn primary" onclick="toast(t('添加用户功能待接入'))">＋ 添加用户</button>
+          </div>
+          <div class="panel">
+            <div class="filters">
+              <input placeholder="用户名">
+              <input placeholder="真实姓名">
+              <select><option>状态：请选择</option><option>启用</option><option>禁用</option></select>
+              <div class="spacer"></div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>用户名</th><th>真实姓名</th><th>角色</th><th>备注</th><th>创建时间</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody id="userTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Alert Detail Drawer -->
+<div id="alertDrawer" class="drawer-mask">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div><b>预警决策中心</b><div class="muted">A-1001 · #1058</div></div>
+      <button class="close" onclick="closeAllOverlays()">×</button>
+    </div>
+    <div class="drawer-body">
+      <div class="decision red">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div class="muted">风险评分</div><div class="risk-score">92</div><div style="font-size:13px;color:#ef4444">该订单极有可能产生拒付</div></div>
+          <span class="badge red">高风险</span>
+        </div>
+      </div>
+      <div class="decision"><h3>风险来源分析</h3><p>国家：<b>美国（高风险地区）</b></p><p>卡类型：<b>虚拟卡</b></p><p>用户行为：<b>新用户 + 大额订单</b></p></div>
+      <div class="decision blue"><h3>系统建议（重要）</h3><p style="color:#16a34a">✔ 强烈建议：暂停发货</p><p style="color:#16a34a">✔ 建议：联系客户验证信息</p><p style="color:#dc2626">✖ 不建议：直接发货（风险极高）</p></div>
+      <div class="decision"><h3>你准备如何处理该订单？</h3><button class="btn primary" onclick="toast('已标记为暂停发货')">暂停发货</button> <button class="btn">正常发货</button> <button class="btn">直接退款</button></div>
+      <div class="decision yellow"><h3>风险提示</h3><p>⚠️ 商品损失风险</p><p>⚠️ 运费无法追回</p><p>⚠️ 拒付率上升可能导致账号受限</p></div>
+    </div>
+    <div class="drawer-foot"><button class="btn red" onclick="toast('已加入黑名单')">加入黑名单</button><button class="btn" onclick="closeAllOverlays()">关闭</button></div>
+  </div>
+</div>
+
+<!-- Rule Drawer -->
+<div id="ruleDrawer" class="drawer-mask">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div><b>编辑匹配规则</b><div class="muted">配置交易金额、交易日期和描述符的匹配方式</div></div>
+      <button class="close" onclick="closeAllOverlays()">×</button>
+    </div>
+    <div class="drawer-body">
+      <table class="risk-table">
+        <thead><tr><th>匹配字段</th><th>配置方式</th><th>权重</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td><b>交易金额</b><div class="muted">支持相同或浮动比例</div></td><td><select><option>浮动10%</option><option>相同</option><option>浮动5%</option><option>浮动15%</option><option>浮动20%</option></select></td><td><select><option>30%</option><option>25%</option><option>20%</option></select></td><td><span class="switch"></span></td></tr>
+          <tr><td><b>交易日期</b><div class="muted">支持同日或 T±N 天</div></td><td><select><option>T+-7</option><option>相同</option><option>T+-1</option><option>T+-3</option><option>T+-5</option></select></td><td><select><option>20%</option><option>15%</option><option>10%</option></select></td><td><span class="switch"></span></td></tr>
+          <tr><td><b>描述符</b><div class="muted">账单显示名称匹配</div></td><td><select><option>相同</option><option>模糊匹配</option><option>匹配开头3位</option><option>匹配开头5位</option><option>包含关键词</option></select></td><td><select><option>25%</option><option>20%</option><option>15%</option></select></td><td><span class="switch"></span></td></tr>
+          <tr><td>交易卡号</td><td>默认相同</td><td>25%</td><td><span class="switch"></span></td></tr>
+          <tr><td>交易币种</td><td>默认相同</td><td>固定</td><td><span class="switch"></span></td></tr>
+        </tbody>
+      </table>
+      <div class="rule-help"><b>匹配结果规则：</b> 总分 ≥ 90 为高匹配；70-89 为中匹配；低于 70 进入人工审核池。</div>
+    </div>
+    <div class="drawer-foot"><button class="btn red" onclick="toast('规则已禁用')">禁用</button><div><button class="btn" onclick="closeAllOverlays()">关闭</button> <button class="btn primary" onclick="toast('规则已保存');closeAllOverlays()">保存规则</button></div></div>
+  </div>
+</div>
+
+<!-- Descriptor Modal -->
+<div id="descriptorModal" class="modal-mask">
+  <div class="modal">
+    <div class="modal-head"><b>添加描述符</b><button class="close" onclick="closeAllOverlays()">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field"><label>描述符名称</label><input placeholder="例如：MY STORE / SHOPIFY*STORE"></div>
+        <div class="field"><label>匹配类型</label><select><option>精确匹配</option><option>模糊匹配</option><option>包含关键词</option><option>匹配开头字符</option></select></div>
+        <div class="field"><label>标签</label><input placeholder="例如：主站 / 备用 / PayPal"></div>
+        <div class="field"><label>状态</label><select><option>启用</option><option>审核中</option><option>停用</option></select></div>
+        <div class="field full"><label>说明</label><textarea placeholder="用于交易匹配和拒付预警识别，可填写描述符来源或适用店铺"></textarea></div>
+      </div>
+      <div class="rule-help">描述符是用户银行卡账单上看到的商户名称。配置后，系统可通过描述符把拒付通知自动关联到 Shopify 订单。</div>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeAllOverlays()">取消</button><button class="btn primary" onclick="toast('描述符已添加');closeAllOverlays()">保存描述符</button></div>
+  </div>
+</div>
+
+<!-- BIN Modal -->
+<div id="binModal" class="modal-mask">
+  <div class="modal">
+    <div class="modal-head"><b>新增 BIN 规则</b><button class="close" onclick="closeAllOverlays()">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field"><label>BIN 号码</label><input placeholder="银行卡前6位/8位，例如 457173"></div>
+        <div class="field"><label>卡组织</label><select><option>Visa</option><option>Mastercard</option><option>Amex</option><option>Discover</option></select></div>
+        <div class="field"><label>发卡国家</label><input placeholder="例如：United States"></div>
+        <div class="field"><label>卡类型</label><select><option>虚拟卡</option><option>预付卡</option><option>信用卡</option><option>借记卡</option><option>商务卡</option></select></div>
+        <div class="field"><label>风险等级</label><select><option>高风险</option><option>中风险</option><option>低风险</option></select></div>
+        <div class="field"><label>处理建议</label><select><option>进入人工审核</option><option>暂停发货</option><option>加入观察名单</option><option>仅记录</option></select></div>
+        <div class="field full"><label>风险原因</label><textarea placeholder="例如：虚拟卡 + 高频拒付 BIN / BIN 国家与 IP 国家不一致"></textarea></div>
+      </div>
+      <div class="rule-help">新增后，该 BIN 会参与后续订单风险评分，并在拒付预警、BIN确认页面中展示。</div>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeAllOverlays()">取消</button><button class="btn primary" onclick="toast('BIN规则已添加');closeAllOverlays()">保存 BIN 规则</button></div>
+  </div>
+</div>
+
+<script>
+/**
+ * 技术接入说明：
+ * - mockData 可替换为后端 API 返回。
+ * - renderDashboard / renderTables / renderChart 可拆成组件。
+ * - navigate(page) 是统一路由入口，后续可替换为 React Router / Vue Router。
+ */
+
+const i18n = {
+  en: {
+    '工作台':'Dashboard','拒付预警':'Alerts','拒付预警 - 描述符':'Alerts - Descriptors','交易匹配':'Transaction Matching','BIN确认':'BIN Center','系统设置':'Settings','黑名单管理':'Blacklist','用户管理':'Users',
+    '预警插件':'Alert Pro','Shopify店铺':'Shopify Store','管理员':'Admin','全部店铺':'All Stores',
+    '风险预警：您的拒付率已超过阈值（1.2%），请及时处理高风险订单，避免更多损失！':'Risk Alert: Your chargeback rate has exceeded the threshold (1.2%). Please handle high-risk orders promptly.',
+    '系统检测到 5 笔高风险订单，预计潜在损失 $8,675.32':'The system detected 5 high-risk orders with an estimated potential loss of $8,675.32.',
+    '立即处理':'Handle Now','潜在拒付损失':'Potential Chargeback Loss','当前拒付率':'Current Chargeback Rate','拒付率':'Chargeback Rate','阈值':'Threshold','较上期':'vs previous period',
+    '高风险订单':'High-risk Orders','已拦截金额':'Prevented Risk Amount','拒付率趋势':'Chargeback Rate Trend','监控拒付率变化，超过阈值自动标记风险点':'Monitor chargeback trends and automatically flag risk points above the threshold',
+    '7天':'7D','30天':'30D','90天':'90D','风险峰值':'Risk Peak','超阈值天数':'Days Above Threshold','主要风险来源':'Main Risk Sources','虚拟卡 / 高客单':'Virtual Card / High AOV',
+    '查看更多 ›':'View More ›','风险分布':'Risk Distribution','风险占比':'Risk Share','国家风险':'Country Risk','BIN风险':'BIN Risk','地址风险':'Address Risk','行为风险':'Behavior Risk','其他':'Other',
+    '任务中心':'Task Center','待审核订单':'Orders to Review','待处理预警':'Alerts to Handle','待匹配交易':'Transactions to Match','待确认BIN':'BIN to Confirm','立即匹配 ›':'Match Now ›','立即确认 ›':'Confirm Now ›',
+    '最新预警':'Latest Alerts','近期拒付记录':'Recent Chargebacks','拒付单号':'Chargeback ID','订单号':'Order ID','金额':'Amount','拒付原因':'Reason','拒付日期':'Chargeback Date','匹配状态':'Match Status','操作':'Action',
+    '类型':'Type','编号':'ID','警报时间':'Alert Time','卡号':'Card','描述符':'Descriptor','风险等级':'Risk Level','查看详情':'View Details',
+    '搜索编号 / 订单号':'Search ID / Order ID','状态：未处理':'Status: Unhandled','处理中':'Processing','已处理':'Processed',
+    '返回':'Back','添加描述符':'Add Descriptor','匹配类型':'Match Type','标签':'Tag','添加时间':'Created Time','状态':'Status','已启用':'Enabled','审核中':'Pending','编辑':'Edit',
+    '交易上传记录':'Transaction Upload Records','上传文件':'Upload File','交易数量':'Transactions','异常数量':'Exceptions','创建时间':'Created Time','查看结果':'View Result',
+    '匹配规则':'Matching Rules','最多 5 组规则，按优先级匹配':'Up to 5 rule groups, matched by priority','新建规则':'New Rule','规则':'Rule','优先级':'Priority','自动匹配订单':'Auto-match orders','启用中':'Active','匹配强度':'Match Strength',
+    '发卡 BIN 确认':'Issuer BIN Check','新增 BIN 规则':'Add BIN Rule','BIN 前6位/8位':'BIN first 6/8 digits','卡组织：全部':'Card Network: All','风险等级：全部':'Risk Level: All','发卡银行':'Issuer Bank','发卡国家':'Issuer Country','卡类型':'Card Type','风险原因':'Risk Reason',
+    '保存设置':'Save Settings','通知策略':'Notification Settings','邮件通知':'Email Notification','收到拒付预警时发送邮件':'Send email when chargeback alert is triggered','后台弹窗':'In-app Notification','系统内实时提醒商家':'Real-time in-app alerts',
+    '风险策略':'Risk Strategy','风险评分阈值':'Risk Score Threshold',
+    '添加黑名单':'Add Blacklist','内容':'Value','命中次数':'Hits','移除':'Remove',
+    '添加用户':'Add User','用户名':'Username','真实姓名':'Real Name','角色':'Role','备注':'Note',
+    '预警决策中心':'Alert Decision Center','风险评分':'Risk Score','该订单极有可能产生拒付':'This order is highly likely to result in a chargeback','风险来源分析':'Risk Source Analysis','系统建议（重要）':'System Recommendation','你准备如何处理该订单？':'How would you like to handle this order?','暂停发货':'Hold Fulfillment','正常发货':'Ship Normally','直接退款':'Refund','风险提示':'Risk Reminder','加入黑名单':'Add to Blacklist','关闭':'Close',
+    '编辑匹配规则':'Edit Matching Rule','配置交易金额、交易日期和描述符的匹配方式':'Configure matching logic for amount, transaction date, and descriptor','匹配字段':'Match Field','配置方式':'Configuration','权重':'Weight','交易金额':'Transaction Amount','交易日期':'Transaction Date','账单显示名称匹配':'Statement descriptor matching','保存规则':'Save Rule','禁用':'Disable',
+    '保存描述符':'Save Descriptor','取消':'Cancel','描述符名称':'Descriptor Name','说明':'Description','保存 BIN 规则':'Save BIN Rule','BIN 号码':'BIN Number','处理建议':'Handling Suggestion',
+    '暂无新通知':'No new notifications','帮助中心开发中':'Help center is under development','设置已保存':'Settings saved','规则已保存':'Rule saved','规则已禁用':'Rule disabled','描述符已添加':'Descriptor added','BIN规则已添加':'BIN rule added','已加入黑名单':'Added to blacklist','已标记为暂停发货':'Marked as hold fulfillment','上传文件功能待接入':'Upload feature pending integration','添加黑名单功能待接入':'Add blacklist feature pending integration','添加用户功能待接入':'Add user feature pending integration','查看匹配结果':'View matching result',
+    '高风险':'High Risk','中风险':'Medium Risk','低风险':'Low Risk','已匹配':'Matched','待确认':'Pending','精确匹配':'Exact Match','模糊匹配':'Fuzzy Match','主站':'Main Site','备用':'Backup','美国':'United States','德国':'Germany','虚拟卡':'Virtual Card','普通卡':'Regular Card','高':'High','中':'Medium','低':'Low','邮箱':'Email','已封禁':'Blocked','启用':'Enabled',
+    '高风险订单预警':'High-risk Order Alert','订单 #1058 风险评分 85 分':'Order #1058 risk score: 85','拒付风险预警':'Chargeback Risk Alert','订单 #1052 匹配到拒付交易':'Order #1052 matched a chargeback transaction','BIN风险预警':'BIN Risk Alert','检测到高风险 BIN 457173':'High-risk BIN 457173 detected','描述符不一致预警':'Descriptor Mismatch Alert','订单 #1048 描述符不一致':'Order #1048 descriptor mismatch',
+    '商品未收到':'Item not received','未授权交易':'Unauthorized transaction','高风险订单':'High-risk Order','描述符异常':'Descriptor Anomaly','BIN 国家与 IP 国家不一致':'BIN country differs from IP country','虚拟卡 + 高频拒付 BIN':'Virtual card + frequent chargeback BIN',
+    '交易卡号':'Card Number','交易币种':'Currency','默认相同':'Default Exact Match','固定':'Fixed','浮动10%':'±10%','相同':'Exact Match','模糊匹配':'Fuzzy Match','匹配开头3位':'Match First 3 Characters','匹配开头5位':'Match First 5 Characters','包含关键词':'Contains Keyword'
+  }
+};
+let currentLang = 'zh';
+function t(text){ return currentLang === 'zh' ? text : (i18n.en[text] || text); }
+function toggleLanguage(){
+  currentLang = currentLang === 'zh' ? 'en' : 'zh';
+  document.getElementById('langToggle').textContent = currentLang === 'zh' ? 'English' : '中文';
+  applyLanguage();
+}
+function translateStaticText(){
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node){
+      if(!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      if(['SCRIPT','STYLE','TEXTAREA'].includes(node.parentElement?.tagName)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes=[];
+  while(walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node=>{
+    const raw=node.nodeValue, trimmed=raw.trim();
+    if(currentLang==='en'){
+      if(!node._zh) node._zh=trimmed;
+      const translated=i18n.en[node._zh] || i18n.en[trimmed];
+      if(translated) node.nodeValue=raw.replace(trimmed,translated);
+    }else if(node._zh){
+      node.nodeValue=raw.replace(trimmed,node._zh);
+    }
+  });
+  document.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(el=>{
+    if(!el.dataset.zhPlaceholder) el.dataset.zhPlaceholder=el.getAttribute('placeholder');
+    el.setAttribute('placeholder', currentLang==='en' ? (i18n.en[el.dataset.zhPlaceholder] || el.dataset.zhPlaceholder) : el.dataset.zhPlaceholder);
+  });
+}
+function applyLanguage(){
+  translateStaticText();
+  document.getElementById('topTitle').textContent = t(pageTitles[document.querySelector('.page.active')?.id] || '工作台');
+  renderTables();
+  renderApexChart(true);
+}
+
+const mockData = {
+  highRiskOrders: [
+    {id:'#1058', country:'🇺🇸', amount:'$589.00', level:'高风险', time:'10 分钟前'},
+    {id:'#1057', country:'🇬🇧', amount:'$1,230.00', level:'高风险', time:'30 分钟前'},
+    {id:'#1056', country:'🇨🇦', amount:'$320.00', level:'中风险', time:'1 小时前'},
+    {id:'#1055', country:'🇦🇺', amount:'$780.00', level:'高风险', time:'2 小时前'},
+    {id:'#1054', country:'🇩🇪', amount:'$650.00', level:'中风险', time:'3 小时前'}
+  ],
+  latestAlerts: [
+    {icon:'▲', tone:'red', title:'高风险订单预警', sub:'订单 #1058 风险评分 85 分', time:'10 分钟前'},
+    {icon:'💼', tone:'orange', title:'拒付风险预警', sub:'订单 #1052 匹配到拒付交易', time:'1 小时前'},
+    {icon:'🛡️', tone:'purple', title:'BIN风险预警', sub:'检测到高风险 BIN 457173', time:'2 小时前'},
+    {icon:'🔰', tone:'blue', title:'描述符不一致预警', sub:'订单 #1048 描述符不一致', time:'3 小时前'}
+  ],
+  chargebacks: [
+    {cb:'CB2405310001', order:'#1048', amount:'$589.00', reason:'商品未收到', date:'2024-05-31 10:23', status:'已匹配'},
+    {cb:'CB2405310002', order:'#1052', amount:'$320.00', reason:'未授权交易', date:'2024-05-31 09:18', status:'待确认'}
+  ],
+  alerts: [
+    {type:'高风险订单', no:'A-1001', time:'10 分钟前', amount:'$589.00', card:'****4242', desc:'MY STORE', level:'高风险'},
+    {type:'描述符异常', no:'A-1002', time:'1 小时前', amount:'$320.00', card:'****5555', desc:'UNKNOWN DESC', level:'中风险'}
+  ],
+  descriptors: [
+    {id:'cbdp_260428150536', match:'精确匹配', tag:'主站', desc:'MY STORE', created:'2024-05-31 15:05', status:'已启用'},
+    {id:'cbdp_260428150537', match:'模糊匹配', tag:'备用', desc:'SHOPIFY*STORE', created:'2024-05-30 11:05', status:'审核中'}
+  ],
+  uploads: [
+    {id:'WINSHIELD_2605311024', total:136, abnormal:8, created:'2024-05-31 10:24'},
+    {id:'WINSHIELD_2605300918', total:89, abnormal:3, created:'2024-05-30 09:18'}
+  ],
+  bins: [
+    {bin:'457173', bank:'Chase Bank', scheme:'Visa', country:'美国', type:'虚拟卡', risk:'高', reason:'虚拟卡 + 高频拒付 BIN'},
+    {bin:'555555', bank:'Deutsche Bank', scheme:'Mastercard', country:'德国', type:'普通卡', risk:'中', reason:'BIN 国家与 IP 国家不一致'}
+  ],
+  blacklist: [
+    {type:'邮箱', value:'test@gmail.com', hits:6, status:'已封禁'},
+    {type:'BIN', value:'457173', hits:12, status:'高风险'}
+  ],
+  users: [
+    {email:'h577697909@gmail.com', name:'一鸣刘', role:'System Management（系统管理员）', note:'-', created:'2024-05-31 10:02', status:'启用'}
+  ],
+  rules: [
+    {id:'R1', strength:92, fields:['交易金额 浮动10%','交易卡号 相同','交易币种 相同','描述符 相同','交易日期 T+-7']},
+    {id:'R2', strength:78, fields:['交易金额 相同','交易卡号 相同','交易币种 相同','描述符 相同','交易日期 相同']}
+  ],
+  chart: {
+    labels:['05-01','05-03','05-05','05-07','05-09','05-11','05-13','05-15','05-17','05-19','05-21','05-23','05-25','05-27','05-31'],
+    series:[0.82,0.96,1.18,1.34,1.28,1.16,1.43,1.22,1.12,1.58,1.64,1.72,1.26,1.41,1.52]
+  }
+};
+
+const pageTitles = {
+  dashboard:'工作台',
+  alerts:'拒付预警',
+  descriptor:'拒付预警 - 描述符',
+  matching:'交易匹配',
+  bin:'BIN确认',
+  settings:'系统设置',
+  blacklist:'黑名单管理',
+  users:'用户管理'
+};
+
+let chartInstance = null;
+
+function badgeClass(value){
+  if(['高风险','高','已封禁'].includes(value)) return 'red';
+  if(['中风险','中','待确认','审核中'].includes(value)) return 'orange';
+  if(['已匹配','已启用','启用','低'].includes(value)) return 'green';
+  return 'gray';
+}
+
+function navigate(page, navEl){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(navEl) navEl.classList.add('active');
+  document.getElementById('topTitle').textContent = t(pageTitles[page] || '工作台');
+  window.scrollTo(0,0);
+}
+
+function openDrawer(id){document.getElementById(id).style.display='flex'}
+function openModal(id){document.getElementById(id).style.display='flex'}
+function closeAllOverlays(){document.querySelectorAll('.drawer-mask,.modal-mask').forEach(el=>el.style.display='none')}
+
+function toast(msg){
+  const old = document.querySelector('.toast');
+  if(old) old.remove();
+  const t=document.createElement('div');
+  t.className='toast';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),1800);
+}
+
+function renderTables(){
+  highRiskOrders.innerHTML = mockData.highRiskOrders.map(o=>`
+    <tr><td><b style="color:#2563eb">${o.id}</b></td><td>${o.country}</td><td>${o.amount}</td><td><span class="badge ${badgeClass(o.level)}">${t(o.level)}</span></td><td>${o.time}</td></tr>
+  `).join('');
+
+  latestAlerts.innerHTML = mockData.latestAlerts.map(a=>`
+    <div class="alert-row"><div class="alert-icon ${a.tone}">${a.icon}</div><div class="alert-body"><div class="alert-title">${t(a.title)}</div><div class="alert-sub">${t(a.sub)}</div></div><div class="muted">${a.time}</div></div>
+  `).join('');
+
+  chargebackRecords.innerHTML = mockData.chargebacks.map(c=>`
+    <tr><td>${c.cb}</td><td>${c.order}</td><td>${c.amount}</td><td>${t(c.reason)}</td><td>${c.date}</td><td><span class="badge ${badgeClass(c.status)}">${t(c.status)}</span></td><td><button class="btn ghost" onclick="openDrawer('alertDrawer')">${t('查看详情')} ›</button></td></tr>
+  `).join('');
+
+  alertTable.innerHTML = mockData.alerts.map(a=>`
+    <tr><td>${t(a.type)}</td><td>${a.no}</td><td>${a.time}</td><td>${a.amount}</td><td>${a.card}</td><td>${a.desc}</td><td><span class="badge ${badgeClass(a.level)}">${t(a.level)}</span></td><td><button class="btn primary" onclick="openDrawer('alertDrawer')">${t('查看详情')}</button></td></tr>
+  `).join('');
+
+  descriptorTable.innerHTML = mockData.descriptors.map(d=>`
+    <tr><td>${d.id}</td><td>${t(d.match)}</td><td>${t(d.tag)}</td><td>${d.desc}</td><td>${d.created}</td><td><span class="badge ${badgeClass(d.status)}">${t(d.status)}</span></td><td><button class="btn" onclick="openModal('descriptorModal')">${t('编辑')}</button></td></tr>
+  `).join('');
+
+  uploadTable.innerHTML = mockData.uploads.map(u=>`
+    <tr><td>${u.id}</td><td>${u.total}</td><td>${u.abnormal}</td><td>${u.created}</td><td><button class="btn ghost" onclick="toast(t('查看匹配结果'))">${t('查看结果')}</button></td></tr>
+  `).join('');
+
+  binTable.innerHTML = mockData.bins.map(b=>`
+    <tr><td>${b.bin}</td><td>${b.bank}</td><td>${b.scheme}</td><td>${t(b.country)}</td><td>${t(b.type)}</td><td><span class="badge ${badgeClass(b.risk)}">${t(b.risk)}</span></td><td>${t(b.reason)}</td></tr>
+  `).join('');
+
+  blacklistTable.innerHTML = mockData.blacklist.map(b=>`
+    <tr><td>${t(b.type)}</td><td>${b.value}</td><td>${b.hits}</td><td><span class="badge ${badgeClass(b.status)}">${t(b.status)}</span></td><td><button class="btn" onclick="toast(t('已移除'))">${t('移除')}</button></td></tr>
+  `).join('');
+
+  userTable.innerHTML = mockData.users.map(u=>`
+    <tr><td>${u.email}</td><td>${u.name}</td><td>${u.role}</td><td>${u.note}</td><td>${u.created}</td><td><span class="badge ${badgeClass(u.status)}">${t(u.status)}</span></td><td>👁️ ✏️ 🗑️</td></tr>
+  `).join('');
+
+  ruleCards.innerHTML = mockData.rules.map((r,i)=>`
+    <div class="rule-card" onclick="openDrawer('ruleDrawer')">
+      <div class="rule-top"><div class="rule-meta"><div class="rule-id">${r.id}</div><div><b>${t('规则')} ${i+1}</b><div class="muted">${t('优先级')} ${i+1} · ${t('自动匹配订单')}</div></div></div><span class="badge green">${t('启用中')}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px"><span class="muted">${t('匹配强度')}</span><div class="progress"><span style="width:${r.strength}%"></span></div><b>${r.strength}%</b></div>
+      <div class="chip-grid">${r.fields.map(f=>`<div class="chip">${t(f)}</div>`).join('')}</div>
+    </div>
+  `).join('');
+}
+
+function renderApexChart(force=false){
+  if(force && chartInstance){ chartInstance.destroy(); chartInstance=null; }
+  const el = document.querySelector('#chargebackRateChart');
+  if(!window.ApexCharts){
+    renderFallbackSvg(el);
+    return;
+  }
+
+  const options = {
+    chart: {
+      type: 'area',
+      height: 315,
+      toolbar: { show:false },
+      zoom: { enabled:false },
+      animations: { enabled:true, easing:'easeinout', speed:650 },
+      fontFamily: 'inherit'
+    },
+    series: [{ name:t('拒付率'), data: mockData.chart.series }],
+    xaxis: {
+      categories: mockData.chart.labels,
+      tickAmount: 5,
+      labels: { style:{ colors:'#94a3b8', fontSize:'12px' } },
+      axisBorder:{ show:false },
+      axisTicks:{ show:false }
+    },
+    yaxis: {
+      min:0,
+      max:2.2,
+      tickAmount:4,
+      labels: { formatter:(v)=>v.toFixed(1)+'%', style:{ colors:'#94a3b8', fontSize:'12px' } }
+    },
+    stroke: { curve:'smooth', width:2.4, lineCap:'round' },
+    colors: ['#2563eb'],
+    fill: {
+      type:'gradient',
+      gradient:{ shadeIntensity:.3, opacityFrom:.24, opacityTo:.02, stops:[0,80,100] }
+    },
+    dataLabels: { enabled:false },
+    grid: { borderColor:'#eef2f7', strokeDashArray:0, padding:{ left:10, right:18, top:0, bottom:0 } },
+    markers: {
+      size:4,
+      strokeWidth:2,
+      strokeColors:'#ffffff',
+      hover:{ size:7 },
+      discrete: mockData.chart.series.map((v,i)=>v>=1.2?{seriesIndex:0,dataPointIndex:i,fillColor:'#ef4444',strokeColor:'#ffffff',size:5}:null).filter(Boolean)
+    },
+    annotations: {
+      yaxis: [{
+        y:1.2,
+        borderColor:'rgba(239,68,68,.45)',
+        strokeDashArray:5,
+        label:{
+          text:t('阈值')+' 1.20%',
+          borderColor:'transparent',
+          style:{ color:'#ef4444', background:'rgba(239,68,68,.08)', fontSize:'12px', fontWeight:700 }
+        }
+      }]
+    },
+    tooltip: {
+      theme:'light',
+      y:{ formatter:(v)=>v.toFixed(2)+'%' },
+      custom: function({ series, seriesIndex, dataPointIndex, w }) {
+        const rate = series[seriesIndex][dataPointIndex];
+        const date = w.globals.labels[dataPointIndex];
+        const diff = (rate - 1.2).toFixed(2);
+        return `<div style="padding:10px 12px">
+          <div style="font-weight:800;margin-bottom:4px">${date}</div>
+          <div>${t('拒付率')}：<b>${rate.toFixed(2)}%</b></div>
+          <div style="color:${rate>=1.2?'#ef4444':'#16a34a'}">${rate>=1.2?(currentLang==='en'?'Above':'高于'):(currentLang==='en'?'Below':'低于')} ${t('阈值')} ${Math.abs(diff)}%</div>
+        </div>`;
+      }
+    }
+  };
+
+  chartInstance = new ApexCharts(el, options);
+  chartInstance.render();
+}
+
+function renderFallbackSvg(el){
+  const data = mockData.chart.series;
+  const labels = mockData.chart.labels;
+  const max=2.2,min=0;
+  const x=(i)=>8+(i/(data.length-1))*88;
+  const y=(v)=>84-((v-min)/(max-min))*64;
+  const pts=data.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+  const alertY=y(1.2);
+  el.innerHTML = `
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%">
+      ${[20,36,52,68,84].map((gy)=>`<line x1="8" y1="${gy}" x2="96" y2="${gy}" stroke="#eef2f7" stroke-width=".45"/>`).join('')}
+      <line x1="8" y1="${alertY}" x2="96" y2="${alertY}" stroke="#ef4444" stroke-opacity=".35" stroke-dasharray="2.5 3" stroke-width=".65"/>
+      <path d="M ${pts.replaceAll(',',' L ')} L 96,84 L 8,84 Z" fill="rgba(37,99,235,.08)"/>
+      <polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      ${data.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="${v>=1.2?1.2:.8}" fill="${v>=1.2?'#ef4444':'#2563eb'}"/>`).join('')}
+    </svg>`;
+}
+
+function bindEvents(){
+  document.querySelectorAll('[data-page]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const page = el.getAttribute('data-page');
+      navigate(page, el.classList.contains('nav-item') ? el : null);
+    });
+  });
+
+  document.querySelectorAll('.chart-tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      document.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      toast(`已切换到 ${tab.textContent} 数据`);
+    });
+  });
+
+  document.querySelectorAll('.switch').forEach(sw=>{
+    sw.addEventListener('click',()=>sw.classList.toggle('off'));
+  });
+
+  document.querySelectorAll('.drawer-mask,.modal-mask').forEach(mask=>{
+    mask.addEventListener('click',(e)=>{
+      if(e.target === mask) closeAllOverlays();
+    });
+  });
+}
+
+renderTables();
+renderApexChart();
+bindEvents();
+</script>
+</body>
+</html>
